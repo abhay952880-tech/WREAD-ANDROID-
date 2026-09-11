@@ -1,0 +1,64 @@
+name: Build WREAD APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract WREAD project
+        run: |
+          mkdir -p extracted
+          unzip -q wread.zip -d extracted
+
+          echo "Extracted files:"
+          find extracted -maxdepth 4 -type f | head -100
+
+      - name: Find Android project
+        run: |
+          GRADLEW=$(find extracted -type f -name gradlew | head -1)
+
+          if [ -z "$GRADLEW" ]; then
+            echo "ERROR: gradlew was not found."
+            exit 1
+          fi
+
+          ANDROID_DIR=$(dirname "$GRADLEW")
+
+          echo "ANDROID_DIR=$ANDROID_DIR" >> "$GITHUB_ENV"
+          echo "Found Android project at: $ANDROID_DIR"
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make Gradle executable
+        run: chmod +x "$ANDROID_DIR/gradlew"
+
+      - name: Build Debug APK
+        run: |
+          cd "$ANDROID_DIR"
+          ./gradlew assembleDebug --stacktrace
+
+      - name: Find APK
+        run: |
+          echo "APK files:"
+          find "$ANDROID_DIR" -type f -name "*.apk" -print
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: WREAD-APK
+          path: |
+            extracted/**/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
