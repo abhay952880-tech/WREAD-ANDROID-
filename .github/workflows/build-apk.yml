@@ -1,0 +1,82 @@
+name: Build WREAD APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract WREAD
+        run: |
+          rm -rf extracted
+          mkdir extracted
+          unzip -q wread.zip -d extracted
+
+      - name: Locate Android project
+        run: |
+          GRADLEW=$(find extracted -type f -name gradlew | head -1)
+
+          if [ -z "$GRADLEW" ]; then
+            echo "ERROR: Android Gradle project not found."
+            find extracted -maxdepth 5 -type f | head -200
+            exit 1
+          fi
+
+          ANDROID_DIR=$(dirname "$GRADLEW")
+          echo "ANDROID_DIR=$ANDROID_DIR" >> "$GITHUB_ENV"
+          echo "Found: $ANDROID_DIR"
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK
+        run: |
+          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+      - name: Check Gradle Wrapper
+        run: |
+          cd "$ANDROID_DIR"
+
+          echo "Checking Gradle wrapper..."
+
+          if [ ! -f "gradle/wrapper/gradle-wrapper.jar" ]; then
+            echo "Wrapper JAR is missing."
+            echo "Generating Gradle wrapper from installed Gradle."
+
+            gradle wrapper
+
+          fi
+
+          chmod +x gradlew
+
+          echo "Wrapper contents:"
+          ls -la gradle/wrapper
+
+      - name: Build WREAD APK
+        run: |
+          cd "$ANDROID_DIR"
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Show APK
+        run: |
+          echo "Generated APK:"
+          find "$ANDROID_DIR" -type f -name "*.apk" -print
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: WREAD-APK
+          path: |
+            extracted/**/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
