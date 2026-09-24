@@ -46,24 +46,14 @@ jobs:
         run: |
           sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
-      - name: gradle wrapper --gradle-version 8.9
+      - name: Pin Gradle wrapper version
         run: |
           cd "$ANDROID_DIR"
-
-          echo "Checking Gradle wrapper..."
-
-          if [ ! -f "gradle/wrapper/gradle-wrapper.jar" ]; then
-            echo "Wrapper JAR is missing."
-            echo "Generating Gradle wrapper from installed Gradle."
-
-            gradle wrapper
-
-          fi
-
+          echo "Forcing Gradle wrapper to version 8.9..."
+          gradle wrapper --gradle-version 8.9
           chmod +x gradlew
-
           echo "Wrapper contents:"
-          ls -la gradle/wrapper
+          cat gradle/wrapper/gradle-wrapper.properties
 
       - name: Build WREAD APK
         run: |
